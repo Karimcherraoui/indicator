@@ -1,0 +1,69 @@
+//@version=5
+strategy("Enhanced Market Structure and Fibonacci Strategy", overlay=true, calc_on_every_tick=true)
+
+// Input parameters
+rangeLength = input.int(20, "Range Length")
+swingPeriod = input.int(10, "Swing Period for Market Structure")
+rsiPeriod = input.int(14, "RSI Period")
+rsiOverbought = input.int(70, "RSI Overbought Level")
+rsiOversold = input.int(30, "RSI Oversold Level")
+atrPeriod = input.int(14, "ATR Period")
+atrMultiplier = input.float(2.0, "ATR Multiplier for Stop Loss")
+
+// Calculate range
+high_range = ta.highest(high, rangeLength)
+low_range = ta.lowest(low, rangeLength)
+
+// Detect swings
+swingHigh = ta.highest(high, swingPeriod)
+swingLow = ta.lowest(low, swingPeriod)
+
+// Detect market structure
+isUptrend = swingHigh > swingHigh[1] and swingLow > swingLow[1]
+isDowntrend = swingHigh < swingHigh[1] and swingLow < swingLow[1]
+
+// Detect market structure breakout
+upBreakout = not isUptrend[1] and isUptrend
+downBreakout = not isDowntrend[1] and isDowntrend
+
+// Calculate RSI
+rsi = ta.rsi(close, rsiPeriod)
+
+// Calculate ATR for dynamic stop loss
+atr = ta.atr(atrPeriod)
+
+// Fibonacci retracement levels
+var fibHigh = 0.0
+var fibLow = 0.0
+
+if upBreakout
+    fibLow := low[1]
+    fibHigh := high
+
+if downBreakout
+    fibHigh := high[1]
+    fibLow := low
+
+fibDiff = fibHigh - fibLow
+fib618 = fibHigh - fibDiff * 0.618
+
+// Strategy logic
+longCondition = upBreakout and rsi < rsiOversold and close > fib618
+shortCondition = downBreakout and rsi > rsiOverbought and close < fib618
+
+if longCondition
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Long Exit", "Long", stop=strategy.position_avg_price - atr * atrMultiplier)
+
+if shortCondition
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Short Exit", "Short", stop=strategy.position_avg_price + atr * atrMultiplier)
+
+// Plotting
+plot(isUptrend ? swingHigh : na, color=color.green, linewidth=2, title="Uptrend")
+plot(isDowntrend ? swingLow : na, color=color.red, linewidth=2, title="Downtrend")
+plot(fib618, color=color.yellow, linewidth=1, title="0.618 Fib")
+
+// Plot breakouts
+plotshape(longCondition, title="Long Signal", location=location.belowbar, color=color.green, style=shape.triangleup, size=size.small)
+plotshape(shortCondition, title="Short Signal", location=location.abovebar, color=color.red, style=shape.triangledown, size=size.small)
